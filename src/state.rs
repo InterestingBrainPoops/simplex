@@ -72,16 +72,47 @@ impl State {
             MoveType::Push(a, b, c, d) => {
                 self.en_passant = d;
                 self.piece_bit_boards[a as usize] ^= b ^ c;
+                self.color_bit_boards[self.turn as usize] ^= b ^ c;
             }
             MoveType::Promote(a, b, c) => {
-                self.piece_bit_boards[Piece::King as usize] ^= a;
+                self.piece_bit_boards[Piece::Pawn as usize] ^= a;
                 self.piece_bit_boards[b as usize] ^= c;
+                self.color_bit_boards[self.turn as usize] ^= a ^ c;
             }
         }
         self.turn = !self.turn;
     }
+
     pub fn unmake_move(&mut self, move_to_make: Move) {
-        todo!();
+        self.en_passant = move_to_make.en_passant_square;
+        self.turn = !self.turn;
+        match move_to_make.move_type {
+            MoveType::Capture(a, b, c, d) => {
+                self.piece_bit_boards[a as usize] ^= b ^ d; // Move the piece
+                self.piece_bit_boards[c as usize] ^= d; // add the other piece
+                self.color_bit_boards[self.turn as usize] ^= b ^ d;
+                self.color_bit_boards[!self.turn as usize] ^= d;
+            }
+            MoveType::Castle(a) => {
+                self.piece_bit_boards[Piece::King as usize] ^=
+                    CASTLES[a as usize].0 ^ KINGPOS[self.turn as usize]; // Moves the king back
+                self.piece_bit_boards[Piece::Rook as usize] ^=
+                    CASTLES[a as usize].1 ^ ROOKPOS[a as usize]; // Moves the rook back
+                self.color_bit_boards[self.turn as usize] ^= CASTLES[a as usize].0 // Moves the rook and king back in the color bit board.
+                    ^ KINGPOS[self.turn as usize]
+                    ^ CASTLES[a as usize].1
+                    ^ ROOKPOS[a as usize];
+            }
+            MoveType::Push(a, b, c, _) => {
+                self.piece_bit_boards[a as usize] ^= b ^ c; // Moves the piece back.
+                self.color_bit_boards[self.turn as usize] ^= b ^ c;
+            }
+            MoveType::Promote(a, b, c) => {
+                self.piece_bit_boards[Piece::Pawn as usize] ^= a;
+                self.piece_bit_boards[b as usize] ^= c;
+                self.color_bit_boards[self.turn as usize] ^= a ^ c;
+            }
+        }
     }
 
     pub fn get_moves(&self) -> Vec<Move> {
